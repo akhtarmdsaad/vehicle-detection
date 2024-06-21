@@ -3,24 +3,28 @@ import cv2
 import pandas as pd
 import numpy as np
 from ultralytics import YOLO
-from tracker import*
+from tracker import *
 import time
+from handler import *
+from line_segment import checkIntersection
 from math import dist
+
+
 model=YOLO('yolov8s.pt')
 
 
 print("Imported Successfully")
 
-def RGB(event, x, y, flags, param):
-    if event == cv2.EVENT_MOUSEMOVE :  
-        colorsBGR = [x, y]
-        print(colorsBGR)
+# def RGB(event, x, y, flags, param):
+#     if event == cv2.EVENT_MOUSEMOVE :  
+#         colorsBGR = [x, y]
+#         print(colorsBGR)
         
 
-cv2.namedWindow('RGB')
-cv2.setMouseCallback('RGB', RGB)
+# cv2.namedWindow('RGB')
+# cv2.setMouseCallback('RGB', RGB)
 
-cap=cv2.VideoCapture('car-detection.mp4')
+cap=cv2.VideoCapture('../cars.mp4')
 
 
 my_file = open("coco.txt", "r")
@@ -28,114 +32,71 @@ data = my_file.read()
 class_list = data.split("\n") 
 #print(class_list)
 
-count=0
-
-tracker=Tracker()
-
-cy1=322
-cy2=368
-
-offset=6
-
-vh_down={}
-counter=[]
-
-
-vh_up={}
-counter1=[]
-
+prev_tracker = None 
+count = 0
+countDown = 0
+filename = "trip_images/trip{}.png"
 while True:    
     ret,frame = cap.read()
     if not ret:
         break
-    count += 1
-    if count % 3 != 0:
-        continue
-    frame=cv2.resize(frame,(1020,500))
    
 
     results=model.predict(frame)
- #   print(results)
     a=results[0].boxes.data
+    
     px=pd.DataFrame(a).astype("float")
-#    print(px)
-    list=[]
+    l=[]
              
     for index,row in px.iterrows():
-#        print(row)
- 
         x1=int(row[0])
         y1=int(row[1])
         x2=int(row[2])
         y2=int(row[3])
+        conf = int(float(row[4])*100)
         d=int(row[5])
         c=class_list[d]
-        if 'car' in c:
-            list.append([x1,y1,x2,y2])
-    bbox_id=tracker.update(list)
-    for bbox in bbox_id:
-        x3,y3,x4,y4,id=bbox
-        cx=int(x3+x4)//2
-        cy=int(y3+y4)//2
+        cv2.putText(frame,str(c),(x1,y1),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),1)
+        # cv2.putText(frame,"Conf:"+str(conf)+"%",(x2,y2),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),1)
+        l.append(row)
+    tracker = Tracker(l)
+    
+    """
+    draw a line from point1 to point 2
+    """
+    cv2.line(frame,(220,300),(1250,300),(255,255,255),1)
+    cv2.line(frame,(150,50),(350,130),(255,255,255),1)
+    
+    """
+    Get both points and then pass to func to get mapping dictionary
+    """
+    if prev_tracker:
+        l1 = prev_tracker.get_center_points()
+        l2 = tracker.get_center_points()
+        closest_point_dict = get_closest_point_dict(l1,l2)
         
-        cv2.rectangle(frame,(x3,y3),(x4,y4),(0,0,255),2)
-        
+        for k,v in closest_point_dict.items():
+            if checkIntersection((220,300),(1250,301),k,v):
+                count += 1
+                cv2.imwrite(filename.format(count), frame)
+                # input()
+            if checkIntersection((150,50),(350,130),k,v):
+                countDown += 1
+                # input()
 
+    
+    for rect in tracker.get_rects():
+        x1,y1,x2,y2 = rect
+        cv2.rectangle(frame,(x1,y1),(x2,y2),(0,0,255),2)
 
-        if cy1<(cy+offset) and cy1 > (cy-offset):
-           vh_down[id]=time.time()
-        if id in vh_down:
-          
-           if cy2<(cy+offset) and cy2 > (cy-offset):
-             elapsed_time=time.time() - vh_down[id]
-             if counter.count(id)==0:
-                counter.append(id)
-                distance = 10 # meters
-                a_speed_ms = distance / elapsed_time
-                a_speed_kh = a_speed_ms * 3.6
-                cv2.circle(frame,(cx,cy),4,(0,0,255),-1)
-                cv2.putText(frame,str(id),(x3,y3),cv2.FONT_HERSHEY_COMPLEX,0.6,(255,255,255),1)
-                cv2.putText(frame,str(int(a_speed_kh))+'Km/h',(x4,y4 ),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
+    cv2.putText(frame,('goingdown:-')+str(countDown),(1060,50),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
 
-                
-        #####going UP#####     
-        if cy2<(cy+offset) and cy2 > (cy-offset):
-           vh_up[id]=time.time()
-        if id in vh_up:
+    cv2.putText(frame,('goingup:-')+str(count),(1060,100),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
 
-           if cy1<(cy+offset) and cy1 > (cy-offset):
-             elapsed1_time=time.time() - vh_up[id]
+    prev_tracker = tracker
 
- 
-
-
-             if counter1.count(id)==0:
-                counter1.append(id)      
-                distance1 = 10 # meters
-                a_speed_ms1 = distance1 / elapsed1_time
-                a_speed_kh1 = a_speed_ms1 * 3.6
-                cv2.circle(frame,(cx,cy),4,(0,0,255),-1)
-                cv2.putText(frame,str(id),(x3,y3),cv2.FONT_HERSHEY_COMPLEX,0.6,(255,255,255),1)
-                cv2.putText(frame,str(int(a_speed_kh1))+'Km/h',(x4,y4),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
-
-           
-
-    cv2.line(frame,(274,cy1),(814,cy1),(255,255,255),1)
-
-    cv2.putText(frame,('L1'),(277,320),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
-
-
-    cv2.line(frame,(177,cy2),(927,cy2),(255,255,255),1)
- 
-    cv2.putText(frame,('L2'),(182,367),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
-    d=(len(counter))
-    u=(len(counter1))
-    cv2.putText(frame,('goingdown:-')+str(d),(60,90),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
-
-    cv2.putText(frame,('goingup:-')+str(u),(60,130),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
-    cv2.imshow("RGB", frame)
+    cv2.imshow("Car test", frame)
     if cv2.waitKey(1)&0xFF==ord('q'):
         break
 cap.release()
 cv2.destroyAllWindows()
-

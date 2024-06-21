@@ -17,8 +17,8 @@ class Tracker:
         # Get center point of new object
         for rect in objects_rect:
             x, y, w, h = rect
-            cx = (x + x + w) // 2
-            cy = (y + y + h) // 2
+            cx = x + w // 2
+            cy = y + h // 2
 
             # Find out if that object was detected already
             same_object_detected = False
