@@ -24,7 +24,7 @@ print("Imported Successfully")
 # cv2.namedWindow('RGB')
 # cv2.setMouseCallback('RGB', RGB)
 
-cap=cv2.VideoCapture('../cars.mp4')
+cap=cv2.VideoCapture('cars.mp4')
 
 
 my_file = open("coco.txt", "r")
@@ -56,7 +56,7 @@ while True:
         conf = int(float(row[4])*100)
         d=int(row[5])
         c=class_list[d]
-        cv2.putText(frame,str(c),(x1,y1),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),1)
+        # cv2.putText(frame,str(c),(x1,y1),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),1)
         # cv2.putText(frame,"Conf:"+str(conf)+"%",(x2,y2),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),1)
         l.append(row)
     tracker = Tracker(l)
