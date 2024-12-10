@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+trip_images/
+yolo*_model
+yolo*.torchscript
+*.json
+*.db
+.DS_Store
